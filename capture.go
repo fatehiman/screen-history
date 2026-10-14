@@ -139,11 +139,34 @@ func (r *Recorder) tick() {
 		return
 	}
 
+	if cfg.MinFreeGB > 0 {
+		if free, err := freeSpace(existingParent(cfg.TargetDir)); err == nil && float64(free) < cfg.MinFreeGB*(1<<30) {
+			// keep the text stable, so the warning balloon is shown only once
+			r.setState(StateError, fmt.Sprintf("less than %.1f GB free on the disk, not saving", cfg.MinFreeGB))
+			return
+		}
+	}
+
 	if err := r.capture(cfg); err != nil {
 		r.setState(StateError, err.Error())
 		return
 	}
 	r.setState(StateRunning, "")
+}
+
+// existingParent returns dir, or its nearest parent that exists, so the free
+// space can be checked before the target folder is created.
+func existingParent(dir string) string {
+	for {
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return dir
+		}
+		dir = parent
+	}
 }
 
 func matchesPrivacy(title string, list []string) bool {

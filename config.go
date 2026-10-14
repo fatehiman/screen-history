@@ -13,6 +13,7 @@ type Config struct {
 	KeepDays      int      `json:"keepDays"`      // 0 = only today, 1 = today + yesterday, ...
 	TargetDir     string   `json:"targetDir"`     // one subfolder per day (2006-01-02) is created here
 	JPEGQuality   int      `json:"jpegQuality"`   // 1..100
+	MinFreeGB     float64  `json:"minFreeGB"`     // do not capture when the target disk has less free space (0 = off)
 	SkipUnchanged bool     `json:"skipUnchanged"` // do not save when the screen did not change
 	StartWithOS   bool     `json:"startWithOS"`   // start automatically after login
 	PrivacyTitles []string `json:"privacyTitles"` // auto-pause while the focused window title contains one of these
@@ -24,6 +25,7 @@ func defaultConfig() Config {
 		KeepDays:      2,
 		TargetDir:     filepath.Join(exeDir(), "screenshots"),
 		JPEGQuality:   70,
+		MinFreeGB:     1.0,
 		SkipUnchanged: true,
 		PrivacyTitles: []string{},
 	}
@@ -68,6 +70,9 @@ func (c *Config) normalize() {
 	}
 	if c.JPEGQuality < 10 || c.JPEGQuality > 100 {
 		c.JPEGQuality = 70
+	}
+	if c.MinFreeGB < 0 {
+		c.MinFreeGB = 0
 	}
 	if strings.TrimSpace(c.TargetDir) == "" {
 		c.TargetDir = defaultConfig().TargetDir

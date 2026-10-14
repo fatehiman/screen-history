@@ -10,6 +10,15 @@ import (
 	"syscall"
 )
 
+// freeSpace returns the bytes free for the current user on the disk of path.
+func freeSpace(path string) (uint64, error) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(path, &st); err != nil {
+		return 0, err
+	}
+	return st.Bavail * uint64(st.Bsize), nil
+}
+
 // activeWindowTitle needs xdotool on X11. It returns "" when it is missing.
 func activeWindowTitle() string {
 	out, err := exec.Command("xdotool", "getactivewindow", "getwindowname").Output()

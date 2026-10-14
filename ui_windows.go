@@ -9,11 +9,35 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/tailscale/walk"
 	. "github.com/tailscale/walk/declarative"
+	"github.com/tailscale/win"
 	"golang.org/x/sys/windows"
 )
+
+var procMonitorFromPoint = windows.NewLazySystemDLL("user32.dll").NewProc("MonitorFromPoint")
+
+// centerOnScreen moves the form to the center of the work area of the
+// monitor under the mouse cursor (the one with the tray icon you clicked).
+func centerOnScreen(f walk.Form) {
+	var pt win.POINT
+	win.GetCursorPos(&pt)
+	packed := uintptr(uint32(pt.X)) | uintptr(uint32(pt.Y))<<32
+	mon, _, _ := procMonitorFromPoint.Call(packed, win.MONITOR_DEFAULTTOPRIMARY)
+
+	var mi win.MONITORINFO
+	mi.CbSize = uint32(unsafe.Sizeof(mi))
+	if !win.GetMonitorInfo(win.HMONITOR(mon), &mi) {
+		return
+	}
+	wa := mi.RcWork
+	b := f.BoundsPixels()
+	b.X = int(wa.Left) + (int(wa.Right-wa.Left)-b.Width)/2
+	b.Y = int(wa.Top) + (int(wa.Bottom-wa.Top)-b.Height)/2
+	f.SetBoundsPixels(b)
+}
 
 // showError works also before walk is initialized.
 func showError(msg string) {
@@ -36,6 +60,15 @@ func runUI(cfg Config) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Hidden main window: it is never shown. It lets the app exit cleanly when
+	// it gets WM_CLOSE (taskkill without /F, update scripts, logoff).
+	mw, err := walk.NewMainWindow()
+	if err != nil {
+		log.Fatal(err)
+	}
+	mw.SetTitle(appName)
+	mw.Closing().Attach(func(canceled *bool, reason walk.CloseReason) { walk.App().Exit(0) })
 
 	ui := &trayUI{}
 	if ui.iconOn, err = walk.NewIconFromResource("TRAY"); err != nil {
@@ -108,6 +141,9 @@ func (ui *trayUI) buildMenu() {
 }
 
 func (ui *trayUI) showState(s State, msg string) {
+	if s == StateError {
+		ui.ni.ShowWarning(appName, msg) // once, when the error starts or changes
+	}
 	if s == StatePaused || s == StatePrivacy {
 		ui.ni.SetIcon(ui.iconOff)
 	} else {
@@ -162,6 +198,7 @@ func (ui *trayUI) openSettings() {
 		dlg                        *walk.Dialog
 		okPB, cancelPB             *walk.PushButton
 		intervalNE, keepNE, qualNE *walk.NumberEdit
+		minFreeNE                  *walk.NumberEdit
 		folderLE                   *walk.LineEdit
 		skipCB, autoCB             *walk.CheckBox
 		privacyTE                  *walk.TextEdit
@@ -184,6 +221,9 @@ func (ui *trayUI) openSettings() {
 
 			Label{Text: "JPEG quality (10-100):"},
 			NumberEdit{AssignTo: &qualNE, MinValue: 10, MaxValue: 100, Decimals: 0, Value: float64(cfg.JPEGQuality)},
+
+			Label{Text: "Min. free disk space (GB, 0 = off):"},
+			NumberEdit{AssignTo: &minFreeNE, MinValue: 0, MaxValue: 10000, Decimals: 1, Increment: 0.5, Value: cfg.MinFreeGB},
 
 			Label{Text: "Target folder:"},
 			Composite{
@@ -218,6 +258,7 @@ func (ui *trayUI) openSettings() {
 						c.IntervalSec = int(intervalNE.Value())
 						c.KeepDays = int(keepNE.Value())
 						c.JPEGQuality = int(qualNE.Value())
+						c.MinFreeGB = minFreeNE.Value()
 						c.TargetDir = strings.TrimSpace(folderLE.Text())
 						c.SkipUnchanged = skipCB.Checked()
 						c.StartWithOS = autoCB.Checked()
@@ -238,7 +279,11 @@ func (ui *trayUI) openSettings() {
 		showError(err.Error())
 		return
 	}
-	dlg.Run()
+	// Same as dlg.Run(), but center the dialog after Show() gave it its final
+	// size. This happens before the first paint, so the window does not jump.
+	dlg.Show()
+	centerOnScreen(dlg)
+	walk.App().RunModal(dlg)
 }
 
 func (ui *trayUI) applyConfig(c Config) error {

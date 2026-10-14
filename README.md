@@ -11,7 +11,9 @@ used in a form, what data you typed before an app failed, and so on.
   (for example after you typed bank data and forgot to pause).
 - **Privacy titles**: recording pauses by itself while a window whose title
   contains one of your words is focused.
+- **Low disk guard**: no screenshot is saved when the target disk has less free space than *Min. free disk space*.
 - Single instance: a second copy shows an error and exits.
+- Closes cleanly on `WM_CLOSE` (for example `taskkill /IM screen-history.exe` without `/F`).
 - Small: about 7 MB exe, about 20 MB RAM.
 
 ## Tray menu
@@ -32,13 +34,15 @@ shows the state and the last error, if any.
 
 ## Settings
 
-Stored in `config.json` next to the exe.
+Stored in `config.json` next to the exe. The window opens in the center of the
+screen where the mouse is.
 
 | Setting | Meaning |
 |---|---|
 | Interval (seconds) | Time between two captures. Default 10. |
 | Keep days | `0` = keep only today. `1` = today and yesterday. `2` = today and 2 days before (3 days in total). Older day folders are deleted. Cleanup runs at start, every 30 min and after you save settings. |
 | JPEG quality | 10-100. Default 70 (text is still easy to read). |
+| Min. free disk space (GB) | Do not save when the target disk has less free space than this. Default `1.0`. `0` = off. A warning balloon is shown once and the tooltip shows the reason. |
 | Target folder | Where the day folders are created. |
 | Do not save when the screen did not change | Compares the new screen with the last saved one and skips it when almost nothing changed (for example a blinking cursor or the clock). |
 | Start with Windows | Adds / removes `HKCU\...\Run\ScreenHistory`. |

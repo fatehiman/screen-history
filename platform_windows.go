@@ -23,6 +23,17 @@ const (
 	runValue  = "ScreenHistory"
 )
 
+// freeSpace returns the bytes free for the current user on the disk of path.
+func freeSpace(path string) (uint64, error) {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+	var free uint64
+	err = windows.GetDiskFreeSpaceEx(p, &free, nil, nil)
+	return free, err
+}
+
 func activeWindowTitle() string {
 	hwnd, _, _ := procGetForegroundWindow.Call()
 	if hwnd == 0 {
