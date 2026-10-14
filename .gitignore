@@ -1,0 +1,4 @@
+dist/
+config.json
+*.log
+screenshots/

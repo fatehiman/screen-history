@@ -1,0 +1,5 @@
+reference-docs/ export-ignore
+*.md export-ignore
+*.syso binary
+*.ico binary
+*.png binary
